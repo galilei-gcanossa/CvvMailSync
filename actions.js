@@ -55,7 +55,7 @@ function tearDownTimeTrigger(){
 }
 
 function syncBoard_(client, isTimeout, unreadOnly=false){
-  const items = client.getBoard(unreadOnly).reverse();
+  const items = client.getBoard(unreadOnly, false).reverse();
 
   const importedBoardItemIdsJson = PropertiesService.getUserProperties().getProperty(IMPORTED_BOARD_ITEMS_KEY);
   const importedBoardItemIds = !!importedBoardItemIdsJson ? JSON.parse(importedBoardItemIdsJson) : [];
@@ -74,6 +74,7 @@ function syncBoard_(client, isTimeout, unreadOnly=false){
       throw new Error("Timeout exceeded.")
     }
     else{
+      item = client.expandBoardItem(item);
       sendItem(client, item);
       importedBoardItemIds.push(item.id);
       newimportedBoardItemIds.push(item.id);
