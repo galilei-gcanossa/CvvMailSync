@@ -1,0 +1,34 @@
+{
+  "timeZone": "Europe/Rome",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "dependencies": {
+    "libraries": [
+      {
+        "userSymbol": "CvvService",
+        "libraryId": "1o8H8-v_0SEpMod8XmtZCD51pDrix8e3bIlQHlnZAIu4b6-x_HjsArWUW",
+        "version": "46"
+      }
+    ]
+  },
+  "addOns": {
+    "common": {
+      "name": "CvvMailSync",
+      "logoUrl": "https://web.spaggiari.eu/favicon.ico",
+      "useLocaleFromApp": true,
+      "homepageTrigger": {
+        "runFunction": "onHomepage",
+        "enabled": true
+      },
+      "universalActions": []
+    },
+    "gmail": {
+      "contextualTriggers": [
+        {
+          "unconditional": {},
+          "onTriggerFunction": "onGmailMessage"
+        }
+      ]
+    }
+  }
+}
