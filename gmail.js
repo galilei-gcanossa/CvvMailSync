@@ -13,6 +13,15 @@ function onGmailMessage(e) {
   var message = GmailApp.getMessageById(messageId);
   var subject = message.getThread().getFirstMessageSubject();
 
+  if(/^Cvv \[.+\]/.test(subject) == false){
+    return CardService.newCardBuilder()
+      .setHeader(CardService.newCardHeader().setTitle("CvvMailSync detail"))
+      .addSection(CardService.newCardSection()
+        .setHeader("Detail")
+        .addWidget(CardService.newDecoratedText().setText("Not a CvvMailSync message")))
+        .build();
+  }
+
   const itemId = /\[ID:([^\]]+)\]/.exec(subject)[1]
 
   const card = CardService.newCardBuilder()
@@ -23,7 +32,10 @@ function onGmailMessage(e) {
   if(!!itemId){
     const client = CvvService.Accounts.getCurrentActive(APP_NAME).getClient();
 
-    item = client.getBoardItem(itemId);
+    try {
+      item = client.getBoardItem(itemId);
+    }
+    catch(ex){}
   }
 
   const section = CardService.newCardSection()
