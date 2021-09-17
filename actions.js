@@ -60,15 +60,18 @@ function syncBoard_(client, isTimeout, unreadOnly=false){
   const importedBoardItemIdsJson = PropertiesService.getUserProperties().getProperty(IMPORTED_BOARD_ITEMS_KEY);
   const importedBoardItemIds = !!importedBoardItemIdsJson ? JSON.parse(importedBoardItemIdsJson) : [];
 
-  const newimportedBoardItemIds = [];
+  const readBoardItems = [];
+  const processingItems = items.filter(p => !importedBoardItemIds.find(t => t == p.id));
+
+  console.log(`Found ${processingItems.length} new board items.`);
 
   const complete = () => {
     PropertiesService.getUserProperties().setProperty(IMPORTED_BOARD_ITEMS_KEY, JSON.stringify(importedBoardItemIds));
 
-    client.markBoardItemsAsRead(newimportedBoardItemIds);
+    client.markBoardItemsAsRead(readBoardItems);
   }
 
-  items.filter(p => !importedBoardItemIds.find(t => t == p.id)).map(item => {
+  processingItems.map(item => {
     if(isTimeout()){
       complete();
       throw new Error("Timeout exceeded.")
@@ -77,7 +80,7 @@ function syncBoard_(client, isTimeout, unreadOnly=false){
       item = client.expandBoardItem(item);
       sendItem(client, item);
       importedBoardItemIds.push(item.id);
-      newimportedBoardItemIds.push(item.id);
+      readBoardItems.push(item);
     }
   });
 
@@ -104,22 +107,29 @@ function syncBoard(){
 function syncMessages_(client, isTimeout){
   const messages = client.getMessages(true, 1, 50);
 
+  console.log(`Found ${messages.length} new messages.`);
+
   const importedBoardItemIdsJson = PropertiesService.getUserProperties().getProperty(IMPORTED_BOARD_ITEMS_KEY);
   const importedBoardItemIds = !!importedBoardItemIdsJson ? JSON.parse(importedBoardItemIdsJson) : [];
+
+  const processingMessages = messages.filter(p => !p.boardItem || !importedBoardItemIds.find(t => t == p.boardItem.id));
+  const readMessages = [];
 
   const complete = () => {
     PropertiesService.getUserProperties().setProperty(IMPORTED_BOARD_ITEMS_KEY, JSON.stringify(importedBoardItemIds));
 
-    client.markMessagesAsRead(messages.map(p => p.id));
+    client.markMessagesAsRead(readMessages);
   }
 
-  messages.filter(p => !p.boardItem || !importedBoardItemIds.find(t => t == p.boardItem.id)).map(item => {
+  processingMessages.map(item => {
     if(isTimeout()){
       complete();
       throw new Error("Timeout exceeded.")
     }
     else{
       sendItem(client, item);
+
+      readMessages.push(item);
 
       if(!!item.boardItem){
         importedBoardItemIds.push(item.boardItem.id);
