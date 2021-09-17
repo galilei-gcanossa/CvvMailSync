@@ -22,6 +22,15 @@ function onGmailMessage(e) {
         .build();
   }
 
+  if(/\[ID:([^\]]+)\]/.test(subject) == false){
+    return CardService.newCardBuilder()
+      .setHeader(CardService.newCardHeader().setTitle("CvvMailSync detail"))
+      .addSection(CardService.newCardSection()
+        .setHeader("Detail")
+        .addWidget(CardService.newDecoratedText().setText("Not an interactive message")))
+        .build();
+  }
+
   const itemId = /\[ID:([^\]]+)\]/.exec(subject)[1]
 
   const card = CardService.newCardBuilder()
