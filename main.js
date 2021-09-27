@@ -1,10 +1,14 @@
-/*function test() {
+function test() {
 
   //PropertiesService.getUserProperties().deleteProperty(IMPORTED_BOARD_ITEMS_KEY);
   //syncBoard()
-  const client = CvvService.Accounts.getCurrentActive("prova").getClient();
+  //const account = CvvService.account_getActive("prova");
 
-  const items = client.getBoard().slice(0,1);
+  //const items = CvvService.board_get(account).slice(0,1);
+
+  //syncAllUnread()
+
+  return
 
   items.map(item=> {
     MailApp.sendEmail(Session.getActiveUser().getEmail(),item.title, item.text, {
@@ -18,7 +22,7 @@
       })
     });
   })
-}*/
+}
 
 const APP_NAME = "CvvMailSync";
 const SYNC_TIMEOUT = 30*1000;
@@ -32,7 +36,7 @@ function onHomepage(e) {
   
   const builder = CardService.newCardBuilder();
 
-  builder.addSection(createAccountSection());
+  builder.addSection(CvvService.addons_createAccountSection(APP_NAME, "CvvService", "onHomepage"));
   builder.addSection(createActionSection());
 
   return builder.build();
@@ -45,27 +49,27 @@ function onTimeTrigger(){
     return;
   }
 
-  const client = CvvService.Accounts.getCurrentActive(APP_NAME).getClient();
-  if (!client.account.signedIn() && !client.account.signIn()){
+  const account = CvvService.account_getActive(APP_NAME);
+  if (!CvvService.account_signedIn(account) && !CvvService.account_signIn(account)){
     MailApp.sendEmail(Session.getActiveUser().getEmail(), 
       `CvvMailSync CHANGE INVALID CREDENTIALS`, 
-      `The credentials for ${client.account.username} are no longer valid. Please update it or change account. \n
+      `The credentials for ${account.username} are no longer valid. Please update it or change account. \n
       Navigate to: https://script.google.com/a/macros/galileiostiglia.edu.it/s/AKfycbxCnmbye9VO7qYzEErvNTRl1hLOvJR0viK-Nvn9JroLpNHMpobFCJV4dx2zlj3rTcP4Dw/exec?app=${APP_NAME}`, 
       {
         noReply: true,
-        htmlBody: `The credentials for ${client.account.username} are no longer valid. Please update it or change account. <br>
+        htmlBody: `The credentials for ${account.username} are no longer valid. Please update it or change account. <br>
         <a href="https://script.google.com/a/macros/galileiostiglia.edu.it/s/AKfycbxCnmbye9VO7qYzEErvNTRl1hLOvJR0viK-Nvn9JroLpNHMpobFCJV4dx2zlj3rTcP4Dw/exec?app=${APP_NAME}" target="_blank">Change there</a>`,
       }
     );
-    console.log(`Skipping for invalid credentials of ${client.account.username}.`)
+    console.log(`Skipping for invalid credentials of ${account.username}.`)
     return;
   }
   
   try {
     const startTime = new Date();
     const timeoutCheck = () => new Date() - startTime > SYNC_TIMEOUT;
-    syncBoard_(client, timeoutCheck, true);
-    syncMessages_(client, timeoutCheck);
+    syncMessages_(account, timeoutCheck);
+    syncBoard_(account, timeoutCheck, true);
   }
   catch(ex){
     MailApp.sendEmail(Session.getActiveUser().getEmail(), 
@@ -88,7 +92,10 @@ function formatMailSubject_(item){
     if(!!item.boardItem){
       return `Cvv [BOARD][MESSAGE][${formatCreatedAt_(item.createdAt)}][ID:${item.boardItem.id}][${item.sender}] ${item.subject.slice(0,50)}`;
     }
-    else{
+    else if(!!item.contentItem){
+      return `Cvv [CONTENT][MESSAGE][${formatCreatedAt_(item.createdAt)}][${item.sender}] ${item.subject.slice(0,50)}`;
+    }
+    else {
       return `Cvv [MESSAGE][${formatCreatedAt_(item.createdAt)}][${item.sender}] ${item.subject.slice(0,50)}`;
     }
   }
@@ -103,6 +110,14 @@ function getMailBody_(item){
       return {
         text:`${item.subject} \n ${item.body||""} \n ${item.boardItem.title||""}`,
         html:`<h2>${item.subject}</h2> <br> ${item.body||""} <br> ${item.boardItem.title||""}`
+      }
+    }
+    else if(!!item.contentItem){
+      return {
+        text:`${item.subject} \n ${item.body||""} \n ${item.contentItem.title||""} \n 
+          ${item.contentItem.attachments.filter(p => !!p.link).map(p=>p.link)}`,
+        html:`<h2>${item.subject}</h2> <br> ${item.body||""} <br> ${item.contentItem.title||""} <br> 
+          ${item.contentItem.attachments.filter(p => !!p.link).map(p => `<a href="${p.link}">${p.link}</a>`)}`
       }
     }
     else{      
@@ -125,6 +140,9 @@ function getAttachments_(item){
     if(!!item.boardItem){
       return item.boardItem.attachments;
     }
+    else if(!!item.contentItem){
+      return item.contentItem.attachments.filter(p => !!p.url);
+    }
     else{
       return undefined;
     }
@@ -134,7 +152,7 @@ function getAttachments_(item){
   }
 }
 
-function sendItem(client, item){
+function sendItem(account, item){
   const body = getMailBody_(item);
   const attachments = getAttachments_(item);
 
@@ -144,7 +162,7 @@ function sendItem(client, item){
     {
       noReply: true,
       htmlBody: body.html,
-      attachments: attachments?.map(p => client.downloadBoardAttachment(p))
+      attachments: attachments?.map(p => CvvService.utils_downloadResource(account, p))
     }
   );
 }

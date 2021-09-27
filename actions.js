@@ -1,34 +1,6 @@
 const TRIGGER_SET_KEY="trigger_set";
 const IMPORTED_BOARD_ITEMS_KEY="imported_board_items";
 
-function resetAccountChanges(e){
-  return onHomepage();
-}
-
-function saveAccountChanges(e){
-  try{
-    if(!e.formInput.password){
-      CvvService.Accounts.setActive(e.formInput.activeAccount, APP_NAME);
-    }
-    else{
-      CvvService.Accounts.createOrUpdate(e.formInput.username, e.formInput.password);
-      if(!CvvService.Accounts.verify(e.formInput.username)){
-        throw new Error("Invalid credentials.");
-      }
-    }
-
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText(`Saved`))
-      .build();
-  }
-  catch(ex){
-
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText(`ERROR: ${ex.message}`))
-      .build();
-  }
-}
-
 function setUpTimeTrigger_(){
 
   if(!PropertiesService.getUserProperties().getProperty(TRIGGER_SET_KEY)){
@@ -54,8 +26,8 @@ function tearDownTimeTrigger(){
   return onHomepage();
 }
 
-function syncBoard_(client, isTimeout, unreadOnly=false){
-  const items = client.getBoard(unreadOnly, false).reverse();
+function syncBoard_(account, isTimeout, unreadOnly=false){
+  const items = CvvService.board_get(account, unreadOnly, false).reverse();
 
   const importedBoardItemIdsJson = PropertiesService.getUserProperties().getProperty(IMPORTED_BOARD_ITEMS_KEY);
   const importedBoardItemIds = !!importedBoardItemIdsJson ? JSON.parse(importedBoardItemIdsJson) : [];
@@ -68,7 +40,7 @@ function syncBoard_(client, isTimeout, unreadOnly=false){
   const complete = () => {
     PropertiesService.getUserProperties().setProperty(IMPORTED_BOARD_ITEMS_KEY, JSON.stringify(importedBoardItemIds));
 
-    client.markBoardItemsAsRead(readBoardItems);
+    CvvService.board_markItemsAsRead(account, readBoardItems);
   }
 
   processingItems.map(item => {
@@ -77,8 +49,8 @@ function syncBoard_(client, isTimeout, unreadOnly=false){
       throw new Error("Timeout exceeded.")
     }
     else{
-      item = client.expandBoardItem(item);
-      sendItem(client, item);
+      item = CvvService.board_expandItem(account, item);
+      sendItem(account, item);
       importedBoardItemIds.push(item.id);
       readBoardItems.push(item);
     }
@@ -88,10 +60,10 @@ function syncBoard_(client, isTimeout, unreadOnly=false){
 }
 
 function syncBoard(){
-  const client = CvvService.Accounts.getCurrentActive(APP_NAME).getClient();
+  const account = CvvService.account_getActive(APP_NAME);
   try {
     const startTime = new Date();
-    syncBoard_(client, () => new Date() - startTime > SYNC_TIMEOUT);
+    syncBoard_(account, () => new Date() - startTime > SYNC_TIMEOUT);
 
     return CardService.newActionResponseBuilder()
       .setNotification(CardService.newNotification().setText(`Board synced`))
@@ -104,8 +76,8 @@ function syncBoard(){
   }
 }
 
-function syncMessages_(client, isTimeout){
-  const messages = client.getMessages(true, 1, 50);
+function syncMessages_(account, isTimeout){
+  const messages = CvvService.messages_get(account, true, 1, 50);
 
   console.log(`Found ${messages.length} new messages.`);
 
@@ -118,7 +90,7 @@ function syncMessages_(client, isTimeout){
   const complete = () => {
     PropertiesService.getUserProperties().setProperty(IMPORTED_BOARD_ITEMS_KEY, JSON.stringify(importedBoardItemIds));
 
-    client.markMessagesAsRead(readMessages);
+    CvvService.messages_markAsRead(account, readMessages);
   }
 
   processingMessages.map(item => {
@@ -127,7 +99,7 @@ function syncMessages_(client, isTimeout){
       throw new Error("Timeout exceeded.")
     }
     else{
-      sendItem(client, item);
+      sendItem(account, item);
 
       readMessages.push(item);
 
@@ -141,11 +113,11 @@ function syncMessages_(client, isTimeout){
 }
 
 function syncMessages(){
-  const client = CvvService.Accounts.getCurrentActive(APP_NAME).getClient();
+  const account = CvvService.account_getActive(APP_NAME);
   
   try {
     const startTime = new Date();
-    syncMessages_(client, () => new Date() - startTime > SYNC_TIMEOUT);
+    syncMessages_(account, () => new Date() - startTime > SYNC_TIMEOUT);
 
     return CardService.newActionResponseBuilder()
       .setNotification(CardService.newNotification().setText(`Messages synced`))
@@ -154,6 +126,26 @@ function syncMessages(){
   catch(ex){
     return CardService.newActionResponseBuilder()
       .setNotification(CardService.newNotification().setText(`Error while syncing messages: ${ex.message}`))
+      .build();
+  }
+}
+
+function syncAllUnread(){
+  const account = CvvService.account_getActive(APP_NAME);
+  
+  try {
+    const startTime = new Date();
+    const timeoutCheck = () => new Date() - startTime > SYNC_TIMEOUT;
+    syncMessages_(account, timeoutCheck);
+    syncBoard_(account, timeoutCheck, true);
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText(`All synced`))
+      .build();
+  }
+  catch(ex){
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText(`Error while syncing: ${ex.message}`))
       .build();
   }
 }

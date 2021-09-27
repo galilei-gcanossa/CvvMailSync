@@ -39,10 +39,10 @@ function onGmailMessage(e) {
 
   let item;
   if(!!itemId){
-    const client = CvvService.Accounts.getCurrentActive(APP_NAME).getClient();
+    const account = CvvService.account_getActive(APP_NAME);
 
     try {
-      item = client.getBoardItem(itemId);
+      item = CvvService.board_getItem(account, itemId);
     }
     catch(ex){}
   }
@@ -93,9 +93,9 @@ function onGmailMessage(e) {
 
 function confirmAnswer(e){
 
-  try{    
-    const client = CvvService.Accounts.getCurrentActive(APP_NAME).getClient();
-    client.confirmBoardItem(e.commonEventObject.parameters.answerId);
+  try{
+    const account = CvvService.account_getActive(APP_NAME);
+    CvvService.board_confirmItem(account, e.commonEventObject.parameters.answerId);
 
     return CardService.newActionResponseBuilder()
       .setNotification(CardService.newNotification().setText("Confirmation sent"))
@@ -114,8 +114,8 @@ function textAnswer(e){
     if(!e.formInputs.answer)
       throw new Error("Empty answer not allowed");
     
-    const client = CvvService.Accounts.getCurrentActive(APP_NAME).getClient();
-    client.answerBoardItemWithText(e.commonEventObject.parameters.answerId, e.formInputs.answer);
+    const account = CvvService.account_getActive(APP_NAME);
+    CvvService.board_answerItemWithText(account, e.commonEventObject.parameters.answerId, e.formInputs.answer);
 
     return CardService.newActionResponseBuilder()
       .setNotification(CardService.newNotification().setText("Answer sent"))
