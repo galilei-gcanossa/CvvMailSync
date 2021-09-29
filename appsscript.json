@@ -17,7 +17,7 @@
       "logoUrl": "https://web.spaggiari.eu/favicon.ico",
       "useLocaleFromApp": true,
       "homepageTrigger": {
-        "runFunction": "onHomepage",
+        "runFunction": "ui_home",
         "enabled": true
       },
       "universalActions": []
@@ -26,7 +26,7 @@
       "contextualTriggers": [
         {
           "unconditional": {},
-          "onTriggerFunction": "onGmailMessage"
+          "onTriggerFunction": "ui_gmail_currentMessage"
         }
       ]
     }

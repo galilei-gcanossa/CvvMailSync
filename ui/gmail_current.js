@@ -3,7 +3,7 @@
  * @param {Object} e The event object.
  * @return {CardService.Card} The card to show to the user.
  */
-function onGmailMessage(e) {
+ function ui_gmail_currentMessage(e) {
 
   const messageId = e.gmail.messageId;
   
@@ -22,7 +22,9 @@ function onGmailMessage(e) {
         .build();
   }
 
-  if(/\[ID:([^\]]+)\]/.test(subject) == false){
+  const idRegEx = /\[ID:([^\]]+)\]/;
+
+  if(idRegEx.test(subject) == false){
     return CardService.newCardBuilder()
       .setHeader(CardService.newCardHeader().setTitle("CvvMailSync detail"))
       .addSection(CardService.newCardSection()
@@ -31,7 +33,7 @@ function onGmailMessage(e) {
         .build();
   }
 
-  const itemId = /\[ID:([^\]]+)\]/.exec(subject)[1]
+  const itemId = idRegEx.exec(subject)[1]
 
   const card = CardService.newCardBuilder()
     .setName("Item")
@@ -58,7 +60,7 @@ function onGmailMessage(e) {
           itemId: itemId,
           answerId:item.expectConfirmAnswer.answerId
         })
-        .setFunctionName("confirmAnswer")));
+        .setFunctionName("ui_gmail_currentMessage_confirmAnswer")));
   }
   else if(!!item?.expectTextAnswer){
     section.addWidget(CardService.newTextInput()
@@ -75,7 +77,7 @@ function onGmailMessage(e) {
           answerId: item.expectTextAnswer.answerId,
           value: item.expectTextAnswer.value
         })
-        .setFunctionName("textAnswer")));
+        .setFunctionName("ui_gmail_currentMessage_textAnswer")));
   }
   else if(!!item?.expectAttachmentAnswer){
     section.addWidget(CardService.newDecoratedText()
@@ -91,7 +93,7 @@ function onGmailMessage(e) {
   return card.build();
 }
 
-function confirmAnswer(e){
+function ui_gmail_currentMessage_confirmAnswer(e){
 
   try{
     const account = CvvService.account_getActive(APP_NAME);
@@ -108,7 +110,7 @@ function confirmAnswer(e){
   }
 }
 
-function textAnswer(e){
+function ui_gmail_currentMessage_textAnswer(e){
 
   try{
     if(!e.formInputs.answer)
