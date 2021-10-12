@@ -3,20 +3,33 @@ function messages_formatCreatedAt_(createdAt){
 }
 
 function messages_formatMailSubject_(item){
+  const attributes = [];
+  let subject = "";
+
   if(item.sender !== undefined && item.subject !== undefined){
+    subject = item.subject;
+
     if(!!item.boardItem){
-      return `Cvv [BOARD][MESSAGE][${messages_formatCreatedAt_(item.createdAt)}][ID:${item.boardItem.id}][${item.sender}] ${item.subject.slice(0,50)}`;
+      attributes.push("BOARD", "MESSAGE", messages_formatCreatedAt_(item.createdAt), `ID:${item.boardItem.id}`, item.sender);
+      if(!!item.boardItem.expectConfirmAnswer || !!item.boardItem.expectTextAnswer || !!item.boardItem.expectAttachmentAnswer)
+        attributes.push("AREQ");
     }
     else if(!!item.contentItem){
-      return `Cvv [CONTENT][MESSAGE][${messages_formatCreatedAt_(item.createdAt)}][${item.sender}] ${item.subject.slice(0,50)}`;
+      attributes.push("CONTENT", "MESSAGE", messages_formatCreatedAt_(item.createdAt), item.sender);
     }
     else {
-      return `Cvv [MESSAGE][${messages_formatCreatedAt_(item.createdAt)}][${item.sender}] ${item.subject.slice(0,50)}`;
+      attributes.push("MESSAGE", messages_formatCreatedAt_(item.createdAt), item.sender);
     }
   }
   else{
-    return `Cvv [BOARD][${messages_formatCreatedAt_(item.createdAt)}][ID:${item.id}] ${item.title.slice(0,50)}`
+    attributes.push("BOARD", messages_formatCreatedAt_(item.createdAt), `ID:${item.id}`);
+    if(!!item.expectConfirmAnswer || !!item.expectTextAnswer || !!item.expectAttachmentAnswer)
+      attributes.push("AREQ");
+
+    subject = item.title;
   }
+
+  return `Cvv ${attributes.map(p=>`[${p}]`).join("")} ${subject.slice(0,50)}`;
 }
 
 function messages_buildMailBody_(item){

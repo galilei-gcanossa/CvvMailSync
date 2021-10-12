@@ -75,30 +75,116 @@ function onTimeTrigger(){
   }
 }
 
-function syncBoard_(account, tsSource, unreadOnly=false){
-  const items = CvvService.board_get(account, unreadOnly, false).reverse();
-
+function getImportedBoardItems_(){
   const importedBoardItemIdsJson = PropertiesService.getUserProperties().getProperty(IMPORTED_BOARD_ITEMS_KEY);
-  const importedBoardItemIds = !!importedBoardItemIdsJson ? JSON.parse(importedBoardItemIdsJson) : [];
+  return !!importedBoardItemIdsJson ? JSON.parse(importedBoardItemIdsJson) : [];
+}
 
+function setImportedBoardItems_(items){
+  PropertiesService.getUserProperties().setProperty(IMPORTED_BOARD_ITEMS_KEY, JSON.stringify(items||[]));
+}
+
+function syncAllUnreadWithMerge_(account, tsSource){
+  const bItems = CvvService.board_get(account, true, false).reverse();
+
+  let importedBoardItemIds = getImportedBoardItems_();
+
+  let pBItems = bItems.filter(p => !importedBoardItemIds.find(t => t == p.id));
+
+  console.log(`Found ${pBItems.length} new board items.`);
+
+  const mItems = CvvService.messages_get(account, true, 1, 50);
+  const pMItems = mItems.filter(p => !p.boardItem || !importedBoardItemIds.find(t => t == p.boardItem.id));
+
+  console.log(`Found ${mItems.length} new messages.`);
+
+  for(let mItem of pMItems){
+    const fItems = pBItems.filter(p => p.type == 'docsdg' && p.title.startsWith(mItem.subject));
+    if(fItems.length==1){
+      mItem.boardItem = fItems[0];
+    }
+  }
+
+  const mRes = handleMessagesSync_(account, tsSource, pMItems, importedBoardItemIds);
+  if(!!mRes.error)
+    throw new Error(mRes.error);
+
+  importedBoardItemIds = getImportedBoardItems_();
+  pBItems = bItems.filter(p => !importedBoardItemIds.find(t => t == p.id));
+
+  const bRes = handleBoardSync_(account, tsSource, pBItems, importedBoardItemIds);
+  if(!!bRes.error)
+      throw new Error(bRes.error);
+
+  return {
+    bStatus:bRes,
+    mStatus:mRes
+  };
+}
+
+function handleMessagesSync_(account, tsSource, messages, importedBoardItemIds){
+  const syncStatus = {
+    total: messages.length,
+    sent: 0,
+    error: undefined
+  };
+
+  const readMessages = [];
   const readBoardItems = [];
-  const processingItems = items.filter(p => !importedBoardItemIds.find(t => t == p.id));
 
-  console.log(`Found ${processingItems.length} new board items.`);
+  const complete = () => {
+    if(readBoardItems.length>0){
+      setImportedBoardItems_(importedBoardItemIds);
+      CvvService.board_markItemsAsRead(account, readBoardItems);
+    }
+
+    if(readMessages.length>0){
+      CvvService.messages_markAsRead(account, readMessages);
+    }
+  }
+
+  for(let item of messages) {
+    if(tsSource.elapsed()){
+      complete();
+      syncStatus.error = "Timeout exceeded.";
+      return syncStatus;
+    }
+    else{
+      messages_sendMessageForItem(account, item);
+
+      readMessages.push(item);
+
+      if(!!item.boardItem){
+        importedBoardItemIds.push(item.boardItem.id);
+        readBoardItems.push(item.boardItem);
+      }
+
+      syncStatus.sent++;
+    }
+  };
+
+  complete();
+
+  return syncStatus;
+}
+
+function handleBoardSync_(account, tsSource, boardItems, importedBoardItemIds){
+  const readBoardItems = [];
 
   const syncStatus = {
-    total: processingItems.length,
+    total: boardItems.length,
     sent: 0,
     error: undefined
   };
 
   const complete = () => {
-    PropertiesService.getUserProperties().setProperty(IMPORTED_BOARD_ITEMS_KEY, JSON.stringify(importedBoardItemIds));
-
-    CvvService.board_markItemsAsRead(account, readBoardItems);
+    if(readBoardItems.length>0){
+      setImportedBoardItems_(importedBoardItemIds);
+      CvvService.board_markItemsAsRead(account, readBoardItems);
+    }
   }
 
-  for(let item of processingItems) {
+  for(let item of boardItems) {
     if(tsSource.elapsed()){
       complete();
       syncStatus.error = "Timeout exceeded.";
@@ -118,71 +204,18 @@ function syncBoard_(account, tsSource, unreadOnly=false){
   return syncStatus;
 }
 
-function syncMessages_(account, tsSource){
-  const messages = CvvService.messages_get(account, true, 1, 50);
-
-  const syncStatus = {
-    total: messages.length,
-    sent: 0,
-    error: undefined
-  };
-
-  console.log(`Found ${messages.length} new messages.`);
-
-  const importedBoardItemIdsJson = PropertiesService.getUserProperties().getProperty(IMPORTED_BOARD_ITEMS_KEY);
-  const importedBoardItemIds = !!importedBoardItemIdsJson ? JSON.parse(importedBoardItemIdsJson) : [];
-
-  const processingMessages = messages.filter(p => !p.boardItem || !importedBoardItemIds.find(t => t == p.boardItem.id));
-  const readMessages = [];
-
-  const complete = () => {
-    PropertiesService.getUserProperties().setProperty(IMPORTED_BOARD_ITEMS_KEY, JSON.stringify(importedBoardItemIds));
-
-    CvvService.messages_markAsRead(account, readMessages);
-  }
-
-  for(let item of processingMessages) {
-    if(tsSource.elapsed()){
-      complete();
-      syncStatus.error = "Timeout exceeded.";
-      return syncStatus;
-    }
-    else{
-      messages_sendMessageForItem(account, item);
-
-      readMessages.push(item);
-
-      if(!!item.boardItem){
-        importedBoardItemIds.push(item.boardItem.id);
-      }
-
-      syncStatus.sent++;
-    }
-  };
-
-  complete();
-
-  return syncStatus;
-}
-
 function syncAllUnread(){
   const account = CvvService.account_getActive(APP_NAME);
   
   try {
     const tsSource = CvvService.utils_createTimeoutSource(SYNC_TIMEOUT);
 
-    const msgStatus = syncMessages_(account, tsSource);
-    if(!!msgStatus.error)
-      throw new Error(msgStatus.error);
-
-    const brdStatus = syncBoard_(account, tsSource, true);
-    if(!!brdStatus.error)
-      throw new Error(brdStatus.error);
+    const rStatus = syncAllUnreadWithMerge_(account, tsSource);
 
     return CardService.newActionResponseBuilder()
       .setNotification(
         CardService.newNotification()
-        .setText(`All synced: ${msgStatus.sent}/${msgStatus.total} messages, ${brdStatus.sent}/${brdStatus.total} boards.`))
+        .setText(`All synced: ${rStatus.mStatus.sent}/${rStatus.mStatus.total} messages, ${rStatus.bStatus.sent}/${rStatus.bStatus.total} boards.`))
       .build();
   }
   catch(ex){

@@ -57,6 +57,8 @@
       .setText("Confirm")
       .setOnClickAction(CardService.newAction()
         .setParameters({
+          messageId: messageId,
+          accessToken: accessToken,
           itemId: itemId,
           answerId:item.expectConfirmAnswer.answerId
         })
@@ -73,6 +75,8 @@
       .setText(item.expectTextAnswer.value ? "Change answer" : "Answer")
       .setOnClickAction(CardService.newAction()
         .setParameters({
+          messageId: messageId,
+          accessToken: accessToken,
           itemId: itemId,
           answerId: item.expectTextAnswer.answerId,
           value: item.expectTextAnswer.value
@@ -99,6 +103,15 @@ function ui_gmail_currentMessage_confirmAnswer(e){
     const account = CvvService.account_getActive(APP_NAME);
     CvvService.board_confirmItem(account, e.commonEventObject.parameters.answerId);
 
+    const messageId = e.commonEventObject.parameters.messageId;
+    const accessToken = e.commonEventObject.parameters.accessToken;
+
+    GmailApp.setCurrentMessageAccessToken(accessToken);  
+    const message = GmailApp.getMessageById(messageId);
+
+    const label = getOrCreateGmailLabel_("cvv/answered");
+    message.getThread().addLabel(label);
+
     return CardService.newActionResponseBuilder()
       .setNotification(CardService.newNotification().setText("Confirmation sent"))
       .build();
@@ -119,6 +132,15 @@ function ui_gmail_currentMessage_textAnswer(e){
     const account = CvvService.account_getActive(APP_NAME);
     CvvService.board_answerItemWithText(account, e.commonEventObject.parameters.answerId, e.formInputs.answer);
 
+    const messageId = e.commonEventObject.parameters.messageId;
+    const accessToken = e.commonEventObject.parameters.accessToken;
+
+    GmailApp.setCurrentMessageAccessToken(accessToken);  
+    const message = GmailApp.getMessageById(messageId);
+
+    const label = getOrCreateGmailLabel_("cvv/answered");
+    message.getThread().addLabel(label);
+
     return CardService.newActionResponseBuilder()
       .setNotification(CardService.newNotification().setText("Answer sent"))
       .build();
@@ -128,4 +150,22 @@ function ui_gmail_currentMessage_textAnswer(e){
       .setNotification(CardService.newNotification().setText(`Error: ${ex.message}`))
       .build();
   }
+}
+
+function getOrCreateGmailLabel_(labelPath) {
+
+  var labels = labelPath.split("/");
+  var gmail, label = "";
+
+  for (var i=0; i<labels.length; i++) {
+
+    if (labels[i] !== "") {
+      label = label + ((i===0) ? "" : "/") + labels[i];
+      gmail = GmailApp.getUserLabelByName(label) ?
+        GmailApp.getUserLabelByName(label) : GmailApp.createLabel(label);
+    }
+  }
+
+  return gmail;
+
 }
