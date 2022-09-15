@@ -93,7 +93,7 @@ function syncAllUnreadWithMerge_(account, tsSource){
 
   console.log(`Found ${pBItems.length} new board items.`);
 
-  const mItems = CvvService.messages_get(account, true, 1, 50);
+  const mItems = CvvService.messages_get(account, true, 1, 50, false);
   const pMItems = mItems.filter(p => !p.boardItem || !importedBoardItemIds.find(t => t == p.boardItem.id));
 
   console.log(`Found ${mItems.length} new messages.`);
@@ -103,6 +103,8 @@ function syncAllUnreadWithMerge_(account, tsSource){
     if(fItems.length==1){
       mItem.boardItem = fItems[0];
     }
+
+    CvvService.messages_get(account, mItem);
   }
 
   const mRes = handleMessagesSync_(account, tsSource, pMItems, importedBoardItemIds);
