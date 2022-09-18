@@ -14,6 +14,10 @@ function ui_home(e) {
 
 function ui_home_createCommonActionSection(){
 
+  const account = CvvService.account_getActive(APP_NAME);
+
+  const result = loadCvvBoardAndMessagesStatus(account);
+
   const section = CardService.newCardSection();
 
   let sectionTitle = "Actions";
@@ -21,48 +25,19 @@ function ui_home_createCommonActionSection(){
   section.setHeader(sectionTitle)
     .setCollapsible(false);
 
-  section.addWidget(CardService.newTextButton()
-    .setText("Synchronize All Unread")
-    .setAltText("Synchronize All Unread")
-    .setOnClickAction(CardService.newAction().setFunctionName("syncAllUnread")));
+  section.addWidget(feat_timeTrigger_control('ui_home'));
 
+  const syncButton = CardService.newTextButton()
+    .setText("Sync")
+    .setAltText("Synchronize Unread")
+    .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+    .setDisabled(!result.shouldUpdate)
+    .setOnClickAction(CardService.newAction().setFunctionName("syncAllUnread"));
 
-  if(!PropertiesService.getUserProperties().getProperty(TRIGGER_SET_KEY)){
-    section.addWidget(CardService.newTextButton()
-      .setText("Setup time trigger")
-      .setAltText("Setup time trigger")
-      .setOnClickAction(CardService.newAction().setFunctionName("ui_home_commonActions_setUpTimeTrigger")));
-  }
-  else {
-    section.addWidget(CardService.newTextButton()
-      .setText("Teardown time trigger")
-      .setAltText("Teardown time trigger")
-      .setOnClickAction(CardService.newAction().setFunctionName("ui_home_commonActions_tearDownTimeTrigger")));
-  }
+  section.addWidget(CardService.newDecoratedText()
+    .setText(`${result?.cvvMsgItems?.length||0} messages, ${result?.newBoardItems?.length||0} boards`)
+    .setButton(syncButton)
+  );
 
   return section;
-}
-
-const TRIGGER_SET_KEY="trigger_set";
-const IMPORTED_BOARD_ITEMS_KEY="imported_board_items";
-
-function ui_home_commonActions_setUpTimeTrigger(){
-  if(!PropertiesService.getUserProperties().getProperty(TRIGGER_SET_KEY)){
-    ScriptApp.newTrigger("onTimeTrigger")
-      .timeBased()
-      .everyHours(1)
-      .create();
-
-    PropertiesService.getUserProperties().setProperty(TRIGGER_SET_KEY, "true");
-  }
-
-  return ui_home();
-}
-
-function ui_home_commonActions_tearDownTimeTrigger(){
-  ScriptApp.getProjectTriggers().filter(p => p.getHandlerFunction() == "onTimeTrigger").map(t => ScriptApp.deleteTrigger(t));
-
-  PropertiesService.getUserProperties().deleteProperty(TRIGGER_SET_KEY);
-
-  return ui_home();
 }

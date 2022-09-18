@@ -1,33 +1,10 @@
 
 const APP_NAME = "CvvMailSync";
+const APP = this;
 const SYNC_TIMEOUT = 30*1000;
 const ACTIVE_HOURS = [7,8,9,10,11,12,13,14,16,18,22];
 
-/*function test() {
-
-  //PropertiesService.getUserProperties().deleteProperty(IMPORTED_BOARD_ITEMS_KEY);
-  //syncBoard()
-  //const account = CvvService.account_getActive("prova");
-
-  //const items = CvvService.board_get(account).slice(0,1);
-
-  //syncAllUnread()
-
-  return
-
-  items.map(item=> {
-    MailApp.sendEmail(Session.getActiveUser().getEmail(),item.title, item.text, {
-      noReply: true,
-      attachments: item.attachments.map(p => {
-        const a = client.downloadBoardAttachment(p);
-        return a;
-        
-        //const file = DriveApp.createFile(a);
-        //return file.getAs(MimeType.PDF);
-      })
-    });
-  })
-}*/
+const IMPORTED_BOARD_ITEMS_KEY="imported_board_items";
 
 function onInvalidCredentials_(account){
   MailApp.sendEmail(Session.getActiveUser().getEmail(), 
@@ -84,43 +61,86 @@ function setImportedBoardItems_(items){
   PropertiesService.getUserProperties().setProperty(IMPORTED_BOARD_ITEMS_KEY, JSON.stringify(items||[]));
 }
 
+function clearCvvBoardAndMessagesStatus(account){
+  const cacheKey = `cvv_board_and_messages_status:${account.username}`;
+  CacheService.getUserCache().remove(cacheKey);
+}
+
+function resetCvvBoardAndMessagesStatus(account){
+  const cacheKey = `cvv_board_and_messages_status:${account.username}`;
+  let result = {
+    knownBoardItemIds: [],
+    newBoardItems: [],
+    cvvMsgItems: [],
+    shouldUpdate: false
+  };
+  CacheService.getUserCache()
+    .put(cacheKey, JSON.stringify(result), 20);
+}
+
+function loadCvvBoardAndMessagesStatus(account){
+  const cacheKey = `cvv_board_and_messages_status:${account.username}`;
+  let resultJSON = CacheService.getUserCache().get(cacheKey);
+  if(!!resultJSON)
+    return JSON.parse(resultJSON);
+    
+  const cvvBoardItems = CvvService.board_get(account, true, false).reverse();
+  let knownBoardItemIds = getImportedBoardItems_();
+
+  const cvvMsgItems = CvvService.messages_get(account, true, 1, 50, false); 
+  // console.log(`Found ${cvvMsgItems.length} new messages.`);
+  
+  let newBoardItems = cvvBoardItems
+    .filter(p => !knownBoardItemIds.find(t => t == p.id) && !cvvMsgItems.find(t => t.boardId == p.id));
+  // console.log(`Found ${newBoardItems.length} new board items.`);
+
+  let result = {
+    knownBoardItemIds: knownBoardItemIds,
+    newBoardItems: newBoardItems,
+    cvvMsgItems: cvvMsgItems,
+    cvvBoardItems: cvvBoardItems,
+    shouldUpdate: newBoardItems.length > 0 || cvvMsgItems.length > 0
+  };
+
+  CacheService.getUserCache()
+    .put(cacheKey, JSON.stringify(result), 20);
+
+  return result;
+}
+
 function syncAllUnreadWithMerge_(account, tsSource){
-  const bItems = CvvService.board_get(account, true, false).reverse();
 
-  let importedBoardItemIds = getImportedBoardItems_();
+  const result = loadCvvBoardAndMessagesStatus(account);
+  let knownBoardItemIds = result.knownBoardItemIds;
+  let newBoardItems = result.newBoardItems;
+  const cvvMsgItems = result.cvvMsgItems;
+  const cvvBoardItems = result.cvvBoardItems;
 
-  let pBItems = bItems.filter(p => !importedBoardItemIds.find(t => t == p.id));
+  const partialMsgItems = cvvMsgItems.filter(p => !p.boardId || !knownBoardItemIds.find(t => t == p.boardId));
 
-  console.log(`Found ${pBItems.length} new board items.`);
-
-  const mItems = CvvService.messages_get(account, true, 1, 50, false);
-  const pMItems = mItems.filter(p => !p.boardItem || !importedBoardItemIds.find(t => t == p.boardItem.id));
-
-  console.log(`Found ${mItems.length} new messages.`);
-
-  for(let mItem of pMItems){
-    const fItems = pBItems.filter(p => p.type == 'docsdg' && p.title.startsWith(mItem.subject));
-    if(fItems.length==1){
-      mItem.boardItem = fItems[0];
+  for(let msg of partialMsgItems){
+    const fItems = newBoardItems.filter(p => p.type == 'docsdg' && p.title.startsWith(msg.subject));
+    if(fItems.length == 1){
+      msg.boardItem = fItems[0];
     }
 
-    CvvService.messages_get(account, mItem);
+    CvvService.messages_expand(account, msg);
   }
 
-  const mRes = handleMessagesSync_(account, tsSource, pMItems, importedBoardItemIds);
+  const mRes = handleMessagesSync_(account, tsSource, partialMsgItems, knownBoardItemIds);
   if(!!mRes.error)
     throw new Error(mRes.error);
 
-  importedBoardItemIds = getImportedBoardItems_();
-  pBItems = bItems.filter(p => !importedBoardItemIds.find(t => t == p.id));
+  knownBoardItemIds = getImportedBoardItems_();
+  newBoardItems = cvvBoardItems.filter(p => !knownBoardItemIds.find(t => t == p.id));
 
-  const bRes = handleBoardSync_(account, tsSource, pBItems, importedBoardItemIds);
+  const bRes = handleBoardSync_(account, tsSource, newBoardItems, knownBoardItemIds);
   if(!!bRes.error)
       throw new Error(bRes.error);
 
   return {
-    bStatus:bRes,
-    mStatus:mRes
+    bStatus: bRes,
+    mStatus: mRes
   };
 }
 
@@ -213,6 +233,7 @@ function syncAllUnread(){
     const tsSource = CvvService.utils_createTimeoutSource(SYNC_TIMEOUT);
 
     const rStatus = syncAllUnreadWithMerge_(account, tsSource);
+    resetCvvBoardAndMessagesStatus(account);
 
     return CardService.newActionResponseBuilder()
       .setNotification(
