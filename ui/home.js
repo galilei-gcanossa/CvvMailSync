@@ -37,6 +37,8 @@ function ui_home_createCommonActionSection(){
   section.addWidget(CardService.newDecoratedText()
     .setText(`${result?.cvvMsgItems?.length||0} messages, ${result?.newBoardItems?.length||0} boards`)
     .setButton(syncButton)
+    .setStartIcon(CardService.newIconImage()
+      .setIcon(CardService.Icon.EMAIL))
   );
 
   return section;

@@ -131,9 +131,6 @@ function syncAllUnreadWithMerge_(account, tsSource){
   if(!!mRes.error)
     throw new Error(mRes.error);
 
-  knownBoardItemIds = getImportedBoardItems_();
-  newBoardItems = cvvBoardItems.filter(p => !knownBoardItemIds.find(t => t == p.id));
-
   const bRes = handleBoardSync_(account, tsSource, newBoardItems, knownBoardItemIds);
   if(!!bRes.error)
       throw new Error(bRes.error);
