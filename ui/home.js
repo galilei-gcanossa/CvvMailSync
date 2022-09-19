@@ -16,7 +16,7 @@ function ui_home_createCommonActionSection(){
 
   const account = CvvService.account_getActive(APP_NAME);
 
-  const result = loadCvvBoardAndMessagesStatus(account);
+  const result = feat_dataStatus_get(account);
 
   const section = CardService.newCardSection();
 
@@ -35,7 +35,7 @@ function ui_home_createCommonActionSection(){
     .setOnClickAction(CardService.newAction().setFunctionName("syncAllUnread"));
 
   section.addWidget(CardService.newDecoratedText()
-    .setText(`${result?.cvvMsgItems?.length||0} messages, ${result?.newBoardItems?.length||0} boards`)
+    .setText(`${result?.newMessages?.length||0} messages, ${result?.newBoards?.length||0} boards`)
     .setButton(syncButton)
     .setStartIcon(CardService.newIconImage()
       .setIcon(CardService.Icon.EMAIL))
