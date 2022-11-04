@@ -51,6 +51,17 @@ function feat_dataStatus_get(account){
 
   status.newMessages = status.messages
     .filter(p => !p.boardId || !status.knownBoardIds.includes(p.boardId));
+
+  for(let msg of status.newMessages) {
+    const found = status.newBoards
+      .filter(p => p.type == 'docsdg' && p.title.startsWith(msg.subject));
+    if(found.length == 1){
+      msg.boardId = found[0].id;
+      msg.boardItem = found[0];
+
+      status.newBoards.splice(status.newBoards.indexOf(found[0]),1);
+    }
+  }
     
   status.shouldUpdate = status.newBoards.length > 0 || status.newMessages.length > 0;
 

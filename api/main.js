@@ -59,13 +59,6 @@ function syncAllUnreadWithMerge_(account, tsSource){
   for(let msg of dataStatus.newMessages){
 
     CvvService.messages_expand(account, msg);
-
-    const found = dataStatus.newBoards
-      .filter(p => p.type == 'docsdg' && p.title.startsWith(msg.subject));
-    if(found.length == 1){
-      msg.boardId = found[0].id;
-      msg.boardItem = found[0];
-    }
   }
 
   const mRes = handleMessagesSync_(account, tsSource, dataStatus.newMessages, dataStatus.knownBoardIds);
