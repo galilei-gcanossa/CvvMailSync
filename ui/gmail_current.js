@@ -3,7 +3,7 @@
  * @param {Object} e The event object.
  * @return {CardService.Card} The card to show to the user.
  */
- function ui_gmail_currentMessage(e) {
+function ui_gmail_currentMessage(e) {
 
   const messageId = e.gmail.messageId;
   

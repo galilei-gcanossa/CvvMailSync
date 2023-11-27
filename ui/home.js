@@ -16,8 +16,6 @@ function ui_home_createCommonActionSection(){
 
   const account = CvvService.account_getActive(APP_NAME);
 
-  const result = feat_dataStatus_get(account);
-
   const section = CardService.newCardSection();
 
   let sectionTitle = "Actions";
@@ -25,13 +23,21 @@ function ui_home_createCommonActionSection(){
   section.setHeader(sectionTitle)
     .setCollapsible(false);
 
+  let result = null;
+  try{
+    result = feat_dataStatus_get(account);
+  }
+  catch(e){
+    section.addWidget(CardService.newDecoratedText().setText(e));
+  }
+
   section.addWidget(feat_timeTrigger_control('ui_home'));
 
   const syncButton = CardService.newTextButton()
     .setText("Sync")
     .setAltText("Synchronize Unread")
     .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
-    .setDisabled(!result.shouldUpdate)
+    .setDisabled(!result?.shouldUpdate)
     .setOnClickAction(CardService.newAction().setFunctionName("syncAllUnread"));
 
   section.addWidget(CardService.newDecoratedText()
